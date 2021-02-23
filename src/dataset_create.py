@@ -15,7 +15,7 @@ def generate_dataset(path, train, test, val):
     outputs = os.path.join(path, "data_2d_semantics", "*")
     scenes_outputs = glob.glob(outputs)
 
-    df = pd.DataFrame(columns = ['x','y','subset'])
+    df = pd.DataFrame(columns = ['x','y','scene','subset'])
 
     for s in scenes_outputs:
         print("=== Processing ",os.path.basename(s), " ===")
@@ -39,8 +39,10 @@ def generate_dataset(path, train, test, val):
                 for f in output_files:
                     new_f = f.replace("data_2d_semantics","data_2d_raw")
                     new_f = new_f.replace(scene + "/", scene + "/" + "image_00/data_rect/")
-                    new_row = pd.Series({"x": new_f, "y": f, "subset": subset})
-                    df = df.append(new_row, ignore_index=True)
+                    
+                    if os.path.exists(new_f):
+                        new_row = pd.Series({"x": new_f, "y": f, "scene": i, "subset": subset})
+                        df = df.append(new_row, ignore_index=True)
                     
                     progress += 1
                     print("\rProgress: {:>3} %".format( progress * 100 / len(output_files) ), end=' ')
