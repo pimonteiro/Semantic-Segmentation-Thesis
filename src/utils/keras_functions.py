@@ -1,6 +1,15 @@
 import numpy as np
 import tensorflow as tf
-import keras.backend as K
+
+if tf.__version__[0] == "2":
+    _IS_TF_2 = True
+    import tensorflow as tf
+    import keras.backend as K
+    from tensorflow.python.client import device_lib
+else:
+    _IS_TF_2 = False
+    from tensorflow.python.client import device_lib
+
 
 def random_crop(img, mask, random_crop_size):
     # Note: image_data_format is 'channel_last'
@@ -19,7 +28,7 @@ def foreground_sparse_accuracy(y_true, y_pred):
     true_pixels = K.argmax(y_true, axis=-1)
     unpacked = tf.unstack(y_true, axis=-1)
     legal_labels = tf.cast(unpacked[0], tf.bool) | ~K.greater(K.sum(y_true, axis=-1), 0)
-    return K.sum(tf.to_float(~legal_labels & K.equal(true_pixels, pred_pixels))) / K.sum(tf.to_float(~legal_labels))
+    return K.sum(tf.compat.v1.to_float(~legal_labels & K.equal(true_pixels, pred_pixels))) / K.sum(tf.compat.v1.to_float(~legal_labels))
 
 def background_sparse_accuracy(y_true, y_pred):
     nb_classes = K.int_shape(y_pred)[-1]
@@ -28,19 +37,19 @@ def background_sparse_accuracy(y_true, y_pred):
     pred_pixels = K.argmax(y_pred, axis=-1)
     true_pixels = K.argmax(y_true, axis=-1) 
     legal_labels = K.greater(K.sum(y_true, axis=-1), 0) & K.equal(true_pixels, 0)
-    return K.sum(tf.to_float(legal_labels & K.equal(true_pixels, pred_pixels))) / K.sum(tf.to_float(legal_labels))
+    return K.sum(tf.compat.v1.to_float(legal_labels & K.equal(true_pixels, pred_pixels))) / K.sum(tf.compat.v1.to_float(legal_labels))
 
 def sparse_accuracy_ignoring_last_label(y_true, y_pred):
     nb_classes = K.int_shape(y_pred)[-1]
     y_pred = K.reshape(y_pred, (-1, nb_classes))
     y_true = K.reshape(y_true, (-1, nb_classes))
     legal_labels = K.greater(K.sum(y_true, axis=-1), 0)
-    return K.sum(tf.to_float(legal_labels & K.equal(K.argmax(y_true, axis=-1),
-                                                    K.argmax(y_pred, axis=-1)))) / K.sum(tf.to_float(legal_labels))
+    return K.sum(tf.compat.v1.to_float(legal_labels & K.equal(K.argmax(y_true, axis=-1),
+                                                    K.argmax(y_pred, axis=-1)))) / K.sum(tf.compat.v1.to_float(legal_labels))
 
 def sparse_crossentropy_ignoring_last_label(y_true, y_pred):
     nb_classes = K.int_shape(y_pred)[-1]
-    y_true = K.one_hot(tf.to_int32(y_true[:,:,0]), nb_classes+1)[:,:,:-1]
+    y_true = K.one_hot(tf.compat.v1.to_int32(y_true[:,:,0]), nb_classes+1)[:,:,:-1]
     return K.categorical_crossentropy(y_true, y_pred)
 
 def sparse_Mean_IOU(y_true, y_pred):
@@ -50,9 +59,9 @@ def sparse_Mean_IOU(y_true, y_pred):
     for i in range(0, nb_classes): # exclude first label (background) and last label (void)
         true_labels = K.equal(y_true[:,:,0], i)
         pred_labels = K.equal(pred_pixels, i)
-        inter = tf.to_int32(true_labels & pred_labels)
-        union = tf.to_int32(true_labels | pred_labels)
-        legal_batches = K.sum(tf.to_int32(true_labels), axis=1)>0
+        inter = tf.compat.v1.to_int32(true_labels & pred_labels)
+        union = tf.compat.v1.to_int32(true_labels | pred_labels)
+        legal_batches = K.sum(tf.compat.v1.to_int32(true_labels), axis=1)>0
         ious = K.sum(inter, axis=1)/K.sum(union, axis=1)
         iou.append(K.mean(tf.gather(ious, indices=tf.where(legal_batches)))) # returns average IoU of the same objects
     iou = tf.stack(iou)
@@ -69,9 +78,9 @@ def Mean_IOU_tensorflow_1(y_true, y_pred):
     for i in range(0, nb_classes): # exclude first label (background) and last label (void)
         true_labels = K.equal(true_pixels, i) & ~void_labels
         pred_labels = K.equal(pred_pixels, i) & ~void_labels
-        inter = tf.to_int32(true_labels & pred_labels)
-        union = tf.to_int32(true_labels | pred_labels)
-        legal_batches = K.sum(tf.to_int32(true_labels), axis=1)>0
+        inter = tf.compat.v1.to_int32(true_labels & pred_labels)
+        union = tf.compat.v1.to_int32(true_labels | pred_labels)
+        legal_batches = K.sum(tf.compat.v1.to_int32(true_labels), axis=1)>0
         ious = K.sum(inter, axis=1)/K.sum(union, axis=1)
         iou.append(K.mean(tf.gather(ious, indices=tf.where(legal_batches)))) # returns average IoU of the same objects
     iou = tf.stack(iou)
@@ -89,9 +98,9 @@ def Mean_IOU_tensorflow_2(y_true, y_pred):
     for i in range(0, nb_classes): # exclude first label (background) and last label (void)
         true_labels = K.equal(true_pixels, i) & ~void_labels
         pred_labels = K.equal(pred_pixels, i) & ~void_labels
-        inter = tf.to_int32(true_labels & pred_labels)
-        union = tf.to_int32(true_labels | pred_labels)
-        legal_batches = K.sum(tf.to_int32(true_labels), axis=1)>0
+        inter = tf.compat.v1.to_int32(true_labels & pred_labels)
+        union = tf.compat.v1.to_int32(true_labels | pred_labels)
+        legal_batches = K.sum(tf.compat.v1.to_int32(true_labels), axis=1)>0
         ious = K.sum(inter, axis=1)/K.sum(union, axis=1)
         iou.append(K.mean(ious[legal_batches]))
     iou = tf.stack(iou)
@@ -258,9 +267,9 @@ def Jaccard(y_true, y_pred):
     for i in range(0, nb_classes): # exclude first label (background) and last label (void)
         true_labels = K.equal(y_true[:,:,0], i)
         pred_labels = K.equal(pred_pixels, i)
-        inter = tf.to_int32(true_labels & pred_labels)
-        union = tf.to_int32(true_labels | pred_labels)
-        legal_batches = K.sum(tf.to_int32(true_labels), axis=1)>0
+        inter = tf.compat.v1.to_int32(true_labels & pred_labels)
+        union = tf.compat.v1.to_int32(true_labels | pred_labels)
+        legal_batches = K.sum(tf.compat.v1.to_int32(true_labels), axis=1)>0
         ious = K.sum(inter, axis=1)/K.sum(union, axis=1)
         if _IS_TF_2:
             iou.append(K.mean(ious[legal_batches]))

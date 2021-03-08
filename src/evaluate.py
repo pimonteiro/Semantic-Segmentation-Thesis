@@ -7,7 +7,7 @@ from keras.optimizers import Adam
 import matplotlib.pyplot as plt
 import os
 
-from utils.keras_functions import sparse_crossentropy_ignoring_last_label, sparse_accuracy_ignoring_last_label, Jaccard
+from utils.keras_functions import sparse_crossentropy_ignoring_last_label, Jaccard
 
 keras_deeplab = importlib.import_module("keras-deeplab-v3-plus.model")
 
@@ -16,7 +16,7 @@ import Keras_segmentation_deeplab_v3_1.utils
 image_size = (512,512)
 
 losses = sparse_crossentropy_ignoring_last_label
-metrics = {'pred_mask' : [Jaccard, sparse_accuracy_ignoring_last_label]}
+metrics = {'pred_mask' : [Jaccard]}
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--model', type=str, required=False, help="Model to evaluate. Only accepts {'xception','mobilenetv2'}")
@@ -48,7 +48,7 @@ def evaluate(model, dataset_path, output, batch_size):
 
     for s in scenes:
         test_generator = SegClass.create_generators(dataset =dataset_path, subscene=s, blur=0, mode='test',
-                                                    n_classes=19, horizontal_flip=True, vertical_flip=False, 
+                                                    n_classes=19, horizontal_flip=False, vertical_flip=False, 
                                                     brightness=0, rotation=False, zoom=0, batch_size=batch_size,
                                                     seed=7, do_ahisteq=False)
         
