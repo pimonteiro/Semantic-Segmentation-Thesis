@@ -6,6 +6,7 @@ import importlib
 from keras.optimizers import Adam
 import matplotlib.pyplot as plt
 import os
+import sys
 
 from utils.keras_functions import sparse_crossentropy_ignoring_last_label, Jaccard
 
@@ -23,7 +24,7 @@ parser.add_argument('--model', type=str, required=False, help="Model to evaluate
 parser.add_argument('--model_folder', type=str, required=False, help="Folder with the custom model files.")
 parser.add_argument('--dataset', type=str, required=True, help="Dataframe containing the dataset.")
 parser.add_argument('--batch_size', type=int, required=True, help="Batch size for the training.")
-parser.add_argument('--output', type=str, required=True, help="Output destination for the resulted evaluation.")
+parser.add_argument('--output', type=str, required=True, help="Output destination for the resulted evaluation. Created if not present")
 
 
 def build_model(model_name):
@@ -43,7 +44,7 @@ def evaluate(model, dataset_path, output, batch_size):
     data = pd.read_csv(dataset_path)
     scenes = np.unique(data[data['subset'] == 'test'].scene)
 
-    os.mkdir(output)
+    os.makedirs(os.path.abspath(output))
     SegClass = Keras_segmentation_deeplab_v3_1.utils.SegModel(dataset_path, image_size=image_size)
 
     for s in scenes:
@@ -54,13 +55,14 @@ def evaluate(model, dataset_path, output, batch_size):
         
         conf_m = np.zeros((19, 19), dtype=float)
         print(s, ':', len(test_generator))
+        progress = 0
+        print("Progress: {:>3} %".format( progress * 100 / len(test_generator) ), end=' ')
         for n in range(len(test_generator)):
             label = np.zeros((batch_size,np.prod(image_size)), dtype='uint8')    
 
             x,y = test_generator.__getitem__(n)
             label = y
             #label[n,:] = y[0,:,0]
-            print("Starting prediction ", n, "...")
             preds = model.predict(x)
             mask = np.reshape(np.argmax(preds, axis=-1), (-1,) + image_size)    
             flat_pred = np.ravel(mask).astype('int')
@@ -75,6 +77,10 @@ def evaluate(model, dataset_path, output, batch_size):
                 #else:
                     #print('Invalid entry encountered, skipping! Label: ', l,
                     #       ' Prediction: ', p)
+            progress += 1
+            print("\rProgress: {:>3} %".format( progress * 100 / len(test_generator) ), end=' ')
+            sys.stdout.flush()
+
         
         I = np.diag(conf_m)
         U = np.sum(conf_m, axis=0) + np.sum(conf_m, axis=1) - I
