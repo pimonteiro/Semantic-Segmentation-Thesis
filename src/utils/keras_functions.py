@@ -50,6 +50,8 @@ def sparse_accuracy_ignoring_last_label(y_true, y_pred):
 def sparse_crossentropy_ignoring_last_label(y_true, y_pred):
     nb_classes = K.int_shape(y_pred)[-1]
     y_true = K.one_hot(tf.compat.v1.to_int32(y_true[:,:,0]), nb_classes+1)[:,:,:-1]
+    print(y_true.shape)
+    print(y_pred.shape)
     return K.categorical_crossentropy(y_true, y_pred)
 
 def sparse_Mean_IOU(y_true, y_pred):

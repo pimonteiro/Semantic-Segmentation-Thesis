@@ -29,7 +29,7 @@ parser.add_argument('--output', type=str, required=True, help="Output destinatio
 
 def build_model(model_name):
     try:
-        deeplab_model = keras_deeplab.Deeplabv3(backbone=model_name, input_shape=(512, 512, 3), classes=19, weights='cityscapes')
+        deeplab_model = keras_deeplab.Deeplabv3(backbone=model_name, input_shape=(512, 512, 3), classes=19, weights='cityscapes', infer=True)
     except:
         raise Exception("No model with given backbone: ", model_name)
 

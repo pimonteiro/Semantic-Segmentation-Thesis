@@ -38,7 +38,7 @@ def build_model(model_name, pretrained):
     else:
         weights = None
     try:
-        deeplab_model = keras_deeplab.Deeplabv3(backbone=model_name, input_shape=(512, 512, 3), classes=19, weights=weights)
+        deeplab_model = keras_deeplab.Deeplabv3(backbone=model_name, input_shape=(512, 512, 3), classes=19, weights=weights, infer=False)
     except:
         raise Exception("No model with given backbone: ", model_name)
 
@@ -81,6 +81,10 @@ def train(model, dataset_path, batch_size, freezed, epochs, name):
     SegClass.set_seg_model(model)
     SegClass.set_num_epochs(epochs)
     SegClass.set_batch_size(batch_size)
+    print(model.summary())
+    for k, l in enumerate(model.layers):
+        print(l.trainable)
+    return
 
     train_generator = SegClass.create_generators(dataset = dataset_path, blur=0, mode='train',
                                                     n_classes=19, horizontal_flip=False, vertical_flip=False, 

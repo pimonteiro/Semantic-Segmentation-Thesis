@@ -211,7 +211,7 @@ def _inverted_res_block(inputs, expansion, stride, alpha, filters, block_id, ski
 
 
 def Deeplabv3(weights='pascal_voc', input_tensor=None, input_shape=(512, 512, 3), classes=21, backbone='mobilenetv2',
-              OS=16, alpha=1., activation=None):
+              OS=16, alpha=1., infer=True):
     """ Instantiates the Deeplabv3+ architecture
     Optionally loads weights pre-trained
     on PASCAL VOC or Cityscapes. This model is available for TensorFlow only.
@@ -436,9 +436,11 @@ def Deeplabv3(weights='pascal_voc', input_tensor=None, input_shape=(512, 512, 3)
                                                     size_before3[1:3],
                                                     method='bilinear', align_corners=True))(x)
 
-    # NEEDS TO BE ANALYSED
-    x = Reshape((input_shape[0]*input_shape[1], classes)) (x) 
-    x = Activation('softmax', name='pred_mask')(x)
+
+    # Used for training, should be ommited while infering
+    if not infer:
+        x = Reshape((input_shape[0]*input_shape[1], classes)) (x) 
+        x = Activation('softmax', name='pred_mask')(x)
 
     # Ensure that the model takes into account
     # any potential predecessors of `input_tensor`.
@@ -447,9 +449,9 @@ def Deeplabv3(weights='pascal_voc', input_tensor=None, input_shape=(512, 512, 3)
     else:
         inputs = img_input
 
-    if activation in {'softmax', 'sigmoid'}:
-        print("lol")
-        x = tf.keras.layers.Activation(activation)(x)
+    # if activation in {'softmax', 'sigmoid'}:
+    #     print("lol")
+    #     x = tf.keras.layers.Activation(activation)(x)
 
     model = Model(inputs, x, name='deeplabv3plus')
 
