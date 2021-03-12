@@ -7,6 +7,7 @@ from keras.optimizers import Adam
 import matplotlib.pyplot as plt
 import os
 import sys
+import time
 
 from utils.keras_functions import sparse_crossentropy_ignoring_last_label, Jaccard
 
@@ -21,15 +22,17 @@ metrics = {'pred_mask' : [Jaccard]}
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--model', type=str, required=False, help="Model to evaluate. Only accepts {'xception','mobilenetv2'}")
+parser.add_argument('--OS', type=int, required=False, help="OS size for xception. Applied ONLY on exception backbone.")
+parser.add_argument('--alpha', type=int, required=False, help="Alpha size for mobilenetv2. Applied ONLY on exception mobilenetv2.")
 parser.add_argument('--model_folder', type=str, required=False, help="Folder with the custom model files.")
 parser.add_argument('--dataset', type=str, required=True, help="Dataframe containing the dataset.")
 parser.add_argument('--batch_size', type=int, required=True, help="Batch size for the training.")
 parser.add_argument('--output', type=str, required=True, help="Output destination for the resulted evaluation. Created if not present")
 
 
-def build_model(model_name):
+def build_model(model_name, os, alpha):
     try:
-        deeplab_model = keras_deeplab.Deeplabv3(backbone=model_name, input_shape=(512, 512, 3), classes=19, weights='cityscapes', infer=True)
+        deeplab_model = keras_deeplab.Deeplabv3(backbone=model_name, input_shape=(512, 512, 3), classes=19, weights='cityscapes', OS=os, alpha=alpha, infer=True)
     except:
         raise Exception("No model with given backbone: ", model_name)
 
@@ -43,6 +46,7 @@ def load_model(path):
 def evaluate(model, dataset_path, output, batch_size):
     data = pd.read_csv(dataset_path)
     scenes = np.unique(data[data['subset'] == 'test'].scene)
+    times_elasped = []
 
     os.makedirs(os.path.abspath(output))
     SegClass = Keras_segmentation_deeplab_v3_1.utils.SegModel(dataset_path, image_size=image_size)
@@ -57,6 +61,7 @@ def evaluate(model, dataset_path, output, batch_size):
         print(s, ':', len(test_generator))
         progress = 0
         print("Progress: {:>3} %".format( progress * 100 / len(test_generator) ), end=' ')
+        time_start = time.time()
         for n in range(len(test_generator)):
             label = np.zeros((batch_size,np.prod(image_size)), dtype='uint8')    
 
@@ -81,7 +86,8 @@ def evaluate(model, dataset_path, output, batch_size):
             print("\rProgress: {:>3} %".format( progress * 100 / len(test_generator) ), end=' ')
             sys.stdout.flush()
 
-        
+        time_end = time.time()
+        times_elasped.append(time_end - time_start)
         I = np.diag(conf_m)
         U = np.sum(conf_m, axis=0) + np.sum(conf_m, axis=1) - I
         IOU = I/U
@@ -95,6 +101,10 @@ def evaluate(model, dataset_path, output, batch_size):
         plt.title('DeepLab\nScene ' + str(s) + '\nMean IOU: '+ str(np.round(np.diag(cm1).mean(), 2)))
         plt.savefig(output + '/' + 'scene ' + str(s) + '.png')
 
+    print("=== Times of execution ===")
+    for i in range(0,len(times_elasped)):
+        print(i, " -> ", times_elasped[i])
+    print("Total time of execution => ", sum(times_elasped))
 
 
 if __name__ == "__main__":
@@ -103,7 +113,15 @@ if __name__ == "__main__":
     if args.model_folder:
         model = load_model(args.model_folder)
     elif args.model:
-        model = build_model(args.model)
+        new_os = 16
+        new_alpha= 1.
+
+        if args.OS:
+            new_os = args.OS
+        if args.alpha:
+            new_alpha= args.alpha
+
+        model = build_model(args.model, new_os, new_alpha)
     else:
         raise Exception("No model or model_folder was definied. Run --help for more details.")
     
