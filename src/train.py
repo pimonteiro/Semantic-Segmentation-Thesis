@@ -50,9 +50,9 @@ def load_model(path):
     pass
 
 def build_callbacks(output_log, tf_board = False):
-    tensorboard = tf.keras.callbacks.TensorBoard(log_dir='./logs/'+output_log, histogram_freq=0,
+    tensorboard = tf.keras.callbacks.TensorBoard(log_dir='../logs/'+output_log, histogram_freq=0,
                         write_graph=False, write_images = False)
-    checkpointer = tf.keras.callbacks.ModelCheckpoint(filepath = './weights/'+output_log+'/'+output_log, verbose=1, save_best_only=True, save_weights_only=True,
+    checkpointer = tf.keras.callbacks.ModelCheckpoint(filepath = '../weights/'+output_log+'/'+output_log+'_model.{epoch:02d}-{val_loss:.2f}-{val_Jaccard:.2f}.h5', verbose=1, save_best_only=True, save_weights_only=True,
                                     monitor = 'val_{}'.format(monitor), mode = mode)
     stop_train = tf.keras.callbacks.EarlyStopping(monitor = 'val_{}'.format(monitor), patience=100, verbose=1, mode = mode)
     reduce_lr = tf.keras.callbacks.ReduceLROnPlateau(monitor = 'val_{}'.format(monitor), factor=0.5,
@@ -81,15 +81,12 @@ def train(model, dataset_path, batch_size, freezed, epochs, name):
     SegClass.set_seg_model(model)
     SegClass.set_num_epochs(epochs)
     SegClass.set_batch_size(batch_size)
-    print(model.summary())
-    for k, l in enumerate(model.layers):
-        print(l.trainable)
-    return
+
 
     train_generator = SegClass.create_generators(dataset = dataset_path, blur=0, mode='train',
                                                     n_classes=19, horizontal_flip=False, vertical_flip=False, 
                                                     brightness=0, rotation=False, zoom=0, batch_size=batch_size,
-                                                    seed=7, do_ahisteq=False)
+                                                    seed=7, do_ahisteq=False, random_crop=True)
 
     valid_generator = SegClass.create_generators(dataset =dataset_path, blur=0, mode='val',
                                                     n_classes=19, horizontal_flip=False, vertical_flip=False, 

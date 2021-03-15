@@ -251,12 +251,12 @@ class SegModel:
 
     def create_generators(self, dataset, mode='train', subscene=None, do_ahisteq=False, n_classes=21, horizontal_flip=True, 
                           vertical_flip=False, blur=False, brightness=0, rotation=5.0, 
-                          zoom=0.1, seed=7, batch_size=1):
+                          zoom=0.1, seed=7, batch_size=1, random_crop=False):
                 
         generator = SegmentationGenerator(dataset = dataset, mode = mode, subscene=subscene, n_classes = n_classes, do_ahisteq = do_ahisteq,
                                        batch_size=batch_size, 
                                        horizontal_flip=horizontal_flip, vertical_flip=vertical_flip, blur = blur,
-                                       brightness=brightness, rotation=rotation, zoom=zoom, seed = seed)
+                                       brightness=brightness, rotation=rotation, zoom=zoom, seed = seed, random_crop=random_crop)
                 
         return generator
 
@@ -293,7 +293,7 @@ class SegmentationGenerator(Sequence):
     
     def __init__(self, dataset, mode='train', subscene=None, n_classes=19, batch_size=1, resize_shape=(512,512), 
                  seed = 7, horizontal_flip=False, blur = 0,
-                 vertical_flip=0, brightness=0., rotation=0, zoom=0, do_ahisteq = False):
+                 vertical_flip=0, brightness=0., rotation=0, zoom=0, do_ahisteq = False, random_crop=False):
         
         self.blur = blur
         self.histeq = do_ahisteq
@@ -315,6 +315,7 @@ class SegmentationGenerator(Sequence):
         self.brightness = brightness
         self.rotation = rotation
         self.zoom = zoom
+        self.random_crop = random_crop
 
         self.image_path_list = sorted(self.dataset.x.tolist())
         self.label_path_list = sorted(self.dataset.y.tolist())
@@ -341,13 +342,24 @@ class SegmentationGenerator(Sequence):
             if self.blur and random.randint(0,1):
                 image = cv2.GaussianBlur(image, (self.blur, self.blur), 0)
 
-            if self.resize_shape:
-                try:
-                    image = cv2.resize(image, self.resize_shape)
-                    label = cv2.resize(label, self.resize_shape, interpolation = cv2.INTER_NEAREST)
-                except:
-                    print(image_path)
-            # Do augmentation
+            if self.random_crop:
+                r = random.random()
+                if r < 0.5:
+                    image, label = _random_crop(image, label, self.resize_shape)
+                else:
+                    try:
+                        image = cv2.resize(image, self.resize_shape)
+                        label = cv2.resize(label, self.resize_shape, interpolation = cv2.INTER_NEAREST)
+                    except:
+                        print(image_path)
+            else:   
+                if self.resize_shape:
+                    try:
+                        image = cv2.resize(image, self.resize_shape)
+                        label = cv2.resize(label, self.resize_shape, interpolation = cv2.INTER_NEAREST)
+                    except:
+                        print(image_path)
+                # Do augmentation
             if self.horizontal_flip and random.randint(0,1):
                 image = cv2.flip(image, 1)
                 label = cv2.flip(label, 1)

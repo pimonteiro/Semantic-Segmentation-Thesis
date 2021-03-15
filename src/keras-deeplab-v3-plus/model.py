@@ -260,7 +260,7 @@ def Deeplabv3(weights='pascal_voc', input_tensor=None, input_shape=(512, 512, 3)
     else:
         img_input = input_tensor
 
-    batches_input = Lambda(lambda x: x/127.5 - 1)(img_input)
+    batches_input = Lambda(lambda x: x/255 - 1)(img_input)
 
     if backbone == 'xception':
         if OS == 8:
