@@ -328,6 +328,9 @@ class SegmentationGenerator(Sequence):
         
     def __len__(self):
         return len(self.image_path_list) // self.batch_size
+
+    def true_len(self):
+        return len(self.image_path_list)
         
     def __getitem__(self, i):
         self.X = np.zeros((self.batch_size, self.resize_shape[1], self.resize_shape[0], 3), dtype='float32')

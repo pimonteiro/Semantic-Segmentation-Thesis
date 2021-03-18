@@ -22,7 +22,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument('--model', type=str, required=False, help="Model to evaluate. Only accepts {'xception','mobilenetv2'}")
 parser.add_argument('--pretrained', default=False, action='store_true', help="False to not use cityscape weights.")
 parser.add_argument('--freezed', default=False, action='store_true', help="True to freeze all layers except last ones.")
-parser.add_argument('--model_folder', type=str, required=False, help="Folder with the custom model files.")
+parser.add_argument('--model_folder', type=str, required=False, help="Model saved as .h5 .")
 parser.add_argument('--dataset', type=str, required=True, help="Dataframe containing the dataset.")
 parser.add_argument('--batch_size', type=int, required=True, help="Batch size for the training.")
 parser.add_argument('--epochs', type=int, required=True, help="Number of epochs for training.")
@@ -47,12 +47,15 @@ def build_model(model_name, pretrained):
     return deeplab_model
 
 def load_model(path):
-    pass
+    deeplab_model = tf.keras.models.load_model(path)
+    
+    return deeplab_model
+    
 
 def build_callbacks(output_log, tf_board = False):
     tensorboard = tf.keras.callbacks.TensorBoard(log_dir='../logs/'+output_log, histogram_freq=0,
                         write_graph=False, write_images = False)
-    checkpointer = tf.keras.callbacks.ModelCheckpoint(filepath = '../weights/'+output_log+'/'+output_log+'_model.{epoch:02d}-{val_loss:.2f}-{val_Jaccard:.2f}.h5', verbose=1, save_best_only=True, save_weights_only=True,
+    checkpointer = tf.keras.callbacks.ModelCheckpoint(filepath = '../weights/'+output_log+'/'+output_log+'_model.{epoch:02d}-{val_loss:.2f}-{val_Jaccard:.2f}.h5', verbose=1, save_best_only=False, save_weights_only=False,
                                     monitor = 'val_{}'.format(monitor), mode = mode)
     stop_train = tf.keras.callbacks.EarlyStopping(monitor = 'val_{}'.format(monitor), patience=100, verbose=1, mode = mode)
     reduce_lr = tf.keras.callbacks.ReduceLROnPlateau(monitor = 'val_{}'.format(monitor), factor=0.5,

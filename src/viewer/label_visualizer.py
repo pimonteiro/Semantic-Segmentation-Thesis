@@ -63,6 +63,6 @@ def vis_segmentation(image, seg_map):
 
 LABEL_NAMES = np.asarray(['road', 'sidewalk', 'building', 'wall', 'fence', 'pole', 
                'traffic light', 'traffic sign', 'vegetation', 'terrain', 'sky', 'person', 
-               'rider', 'car', 'truck', 'bus', 'train', 'motorcycle', 'bicycle'])
+               'rider', 'car', 'truck', 'bus', 'train', 'motorcycle', 'bicycle', 'unknown'])
 FULL_LABEL_MAP = np.arange(len(LABEL_NAMES)).reshape(len(LABEL_NAMES), 1)
 FULL_COLOR_MAP = label_to_color_image(FULL_LABEL_MAP)

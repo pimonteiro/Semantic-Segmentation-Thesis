@@ -49,9 +49,16 @@ def sparse_accuracy_ignoring_last_label(y_true, y_pred):
 
 def sparse_crossentropy_ignoring_last_label(y_true, y_pred):
     nb_classes = K.int_shape(y_pred)[-1]
-    y_true = K.one_hot(tf.compat.v1.to_int32(y_true[:,:,0]), nb_classes)
+    y_true = K.one_hot(tf.compat.v1.to_int32(y_true[:,:,0]), nb_classes+1)[:,:,:-1]     #removing last label -> 255
     return K.categorical_crossentropy(y_true, y_pred)
 
+# remove 255
+def dice_coefficient_ignoring_last_label(y_true, y_pred):
+    y_true_f = tf.reshape(tf.dtypes.cast(y_true, tf.float32), [-1])
+    y_pred_f = tf.reshape(tf.dtypes.cast(y_pred, tf.float32), [-1])
+    intersection = tf.reduce_sum(y_true_f * y_pred_f)
+    return (2. * intersection + 1.) / (tf.reduce_sum(y_true_f) + tf.reduce_sum(y_pred_f) + 1.)
+    
 def sparse_Mean_IOU(y_true, y_pred):
     nb_classes = K.int_shape(y_pred)[-1]
     iou = []
@@ -279,3 +286,40 @@ def Jaccard(y_true, y_pred):
     legal_labels = ~tf.math.is_nan(iou) if _IS_TF_2 else ~tf.debugging.is_nan(iou)
     iou = iou[legal_labels] if _IS_TF_2 else tf.gather(iou, indices=tf.where(legal_labels))
     return K.mean(iou)
+
+def _dice_coef(y_true, y_pred):
+    y_true_f = y_true.flatten()
+    y_pred_f = y_pred.flatten()
+
+    intersection = np.sum(y_true_f * y_pred_f)
+    smooth = 0.0001
+    return (2. * intersection + smooth) / (np.sum(y_true_f) + np.sum(y_pred_f) + smooth)
+
+#not working
+def dice_coef_multilabel(y_true, y_pred):
+    dice=0
+    nb_classes = K.int_shape(y_pred)[-1]
+
+    for index in range(0, nb_classes):
+        dice += _dice_coef(y_true[:,:,0,index], y_pred[:,:,:,index])
+    return dice/len(nb_classes) # taking average
+
+
+#not working
+def pixel_accuracy(y_true, y_pred):    
+    pred_pixels = K.argmax(y_pred, axis=-1)
+    nb_classes = K.int_shape(y_pred)[-1]
+
+    bg_true_labels = K.equal(y_true[:,:,0], 255)
+    to_remove = K.sum(tf.compat.v1.to_int32(bg_true_labels), axis=1)
+    for i in range(0, nb_classes): # exclude first label (background) and last label (void)
+        true_labels = K.equal(y_true[:,:,0], i)
+        pred_labels = K.equal(pred_pixels, i)
+        inter = tf.compat.v1.to_int32(true_labels & pred_labels)
+        union = tf.compat.v1.to_int32(true_labels | pred_labels)
+        legal_batches = K.sum(tf.compat.v1.to_int32(true_labels), axis=1)>0
+        ious = K.sum(inter, axis=1)/K.sum(union, axis=1)
+
+
+
+    return inter_len / len(tmp_true)
