@@ -112,8 +112,11 @@ def build_model(model_name, os, alpha, norm):
     return deeplab_model
 
 def load_model(path):
-    deeplab_model = tf.keras.models.load_model(path)
-    
+    deeplab_model = tf.keras.models.load_model(path, custom_objects={
+        'sparse_crossentropy_ignoring_last_label': sparse_crossentropy_ignoring_last_label,
+        'Jaccard': Jaccard
+        })
+
     return deeplab_model
 
 def evaluate(model, dataset_path, output, batch_size, use_crf, params):
@@ -188,25 +191,27 @@ def evaluate(model, dataset_path, output, batch_size, use_crf, params):
 if __name__ == "__main__":
     args = parser.parse_args()
 
-    if args.model_folder:
-        model = load_model(args.model_folder)
-    elif args.model:
-        new_os = 16
-        new_alpha= 1.
-        new_norm = 1
+    new_os = 8
+    new_alpha= 1.
+    new_norm = 1
 
-        if args.OS:
+    params = {}
+
+    if args.model_folder  is not None:
+        model = load_model(args.model_folder)
+        params['Weights'] = args.model_folder
+    elif args.model  is not None:
+        if args.OS is not None:
             new_os = args.OS
-        if args.alpha:
+        if args.alpha is not None:
             new_alpha = args.alpha
-        if args.norm:
+        if args.norm is not None:
             new_norm = args.norm
 
         model = build_model(args.model, new_os, new_alpha, new_norm)
     else:
         raise Exception("No model or model_folder was definied. Run --help for more details.")
     
-    params = {}
     params['Backbone'] = args.model
     params['OS'] = new_os
     params['Alpha'] = new_alpha

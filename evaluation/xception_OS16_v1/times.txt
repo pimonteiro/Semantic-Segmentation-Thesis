@@ -1,0 +1,9 @@
+Scene 2: ?
+Scene 3: ?
+
+Total: ?
+
+
+OS: 16
+Backbone: Xception
+Normalizaton: [-1,1]

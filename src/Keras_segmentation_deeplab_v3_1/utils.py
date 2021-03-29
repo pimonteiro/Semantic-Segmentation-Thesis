@@ -251,12 +251,12 @@ class SegModel:
 
     def create_generators(self, dataset, mode='train', subscene=None, do_ahisteq=False, n_classes=21, horizontal_flip=True, 
                           vertical_flip=False, blur=False, brightness=0, rotation=5.0, 
-                          zoom=0.1, seed=7, batch_size=1, random_crop=False):
+                          zoom=0.1, seed=7, batch_size=1, random_crop=False, resize_shape=(512,512)):
                 
         generator = SegmentationGenerator(dataset = dataset, mode = mode, subscene=subscene, n_classes = n_classes, do_ahisteq = do_ahisteq,
                                        batch_size=batch_size, 
                                        horizontal_flip=horizontal_flip, vertical_flip=vertical_flip, blur = blur,
-                                       brightness=brightness, rotation=rotation, zoom=zoom, seed = seed, random_crop=random_crop)
+                                       brightness=brightness, rotation=rotation, zoom=zoom, seed = seed, random_crop=random_crop, resize_shape=resize_shape)
                 
         return generator
 
@@ -309,7 +309,7 @@ class SegmentationGenerator(Sequence):
         self.mode = mode
         self.n_classes = n_classes
         self.batch_size = batch_size
-        self.resize_shape = resize_shape
+        self.resize_shape = (resize_shape[1],resize_shape[0])
         self.horizontal_flip = horizontal_flip
         self.vertical_flip = vertical_flip
         self.brightness = brightness

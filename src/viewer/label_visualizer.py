@@ -2,6 +2,7 @@ import numpy as np
 from matplotlib import pyplot as plt
 from matplotlib import gridspec
 from PIL import Image
+import cv2
 
 def create_cityscapes_label_colormap():
     colormap = np.zeros((256, 3), dtype=int)
@@ -27,7 +28,7 @@ def label_to_color_image(label):
     return colormap[label]
 
 
-def vis_segmentation(image, seg_map):
+def vis_segmentation(image, seg_map, output):
     """Visualizes input image, segmentation map and overlay view."""
     plt.figure(figsize=(15, 5))
     grid_spec = gridspec.GridSpec(1, 4, width_ratios=[6, 6, 6, 1])
@@ -45,7 +46,7 @@ def vis_segmentation(image, seg_map):
 
     plt.subplot(grid_spec[2])
     plt.imshow(image)
-    plt.imshow(seg_image, alpha=0.7)
+    plt.imshow(seg_image, alpha=0.5)
     plt.axis('off')
     plt.title('segmentation overlay')
 
@@ -58,8 +59,8 @@ def vis_segmentation(image, seg_map):
     plt.xticks([], [])
     ax.tick_params(width=0.0)
     plt.grid('off')
-    plt.show()
-
+    
+    plt.savefig(output)
 
 LABEL_NAMES = np.asarray(['road', 'sidewalk', 'building', 'wall', 'fence', 'pole', 
                'traffic light', 'traffic sign', 'vegetation', 'terrain', 'sky', 'person', 

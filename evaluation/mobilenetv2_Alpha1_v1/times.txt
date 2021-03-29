@@ -1,0 +1,10 @@
+Scene 2: ?
+Scene 3: ?
+
+Total: ?
+
+
+
+Alpha: 1
+Backbone: MobileNetv2
+Normalizaton: [-1,1]

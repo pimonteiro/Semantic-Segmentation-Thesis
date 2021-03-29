@@ -5,13 +5,14 @@ from keras.optimizers import Adam
 import matplotlib.pyplot as plt
 import os
 
+from tensorflow.keras.preprocessing import image
+
 from utils.keras_functions import sparse_crossentropy_ignoring_last_label, Jaccard
 
 keras_deeplab = importlib.import_module("keras-deeplab-v3-plus.model")
 
 import Keras_segmentation_deeplab_v3_1.utils
 
-image_size = (512,512)
 monitor = 'Jaccard'
 mode = 'max'
 
@@ -27,28 +28,52 @@ parser.add_argument('--dataset', type=str, required=True, help="Dataframe contai
 parser.add_argument('--batch_size', type=int, required=True, help="Batch size for the training.")
 parser.add_argument('--epochs', type=int, required=True, help="Number of epochs for training.")
 parser.add_argument('--name', type=str, required=True, help="Name for the ouput log dir.")
+parser.add_argument('--input_size', type=int, nargs=2, help='Input size for the model.')
 
 gpus = tf.config.list_physical_devices('GPU')
 for gpu in gpus:
     tf.config.experimental.set_memory_growth(gpu, True)
 
-def build_model(model_name, pretrained):
+def build_model(model_name, pretrained, input_size=(512,512,3)):
     if pretrained:
         weights = 'cityscapes'
     else:
         weights = None
     try:
-        deeplab_model = keras_deeplab.Deeplabv3(backbone=model_name, input_shape=(512, 512, 3), classes=19, weights=weights, infer=False)
+        deeplab_model = keras_deeplab.Deeplabv3(backbone=model_name, input_shape=input_size, classes=19, weights=weights, infer=False)
     except:
         raise Exception("No model with given backbone: ", model_name)
 
     deeplab_model.compile(optimizer = Adam(lr=7e-4, epsilon=1e-8, decay=1e-6), sample_weight_mode = "temporal",
               loss = losses, metrics = metrics)
+    
     return deeplab_model
 
 def load_model(path):
-    deeplab_model = tf.keras.models.load_model(path)
-    
+    deeplab_model = tf.keras.models.load_model(path, custom_objects={
+        'sparse_crossentropy_ignoring_last_label': sparse_crossentropy_ignoring_last_label,
+        'Jaccard': Jaccard
+        })
+
+    """   symbolic_weights = getattr(deeplab_model.optimizer, 'weights')
+        weight_values = tf.keras.backend.batch_get_value(symbolic_weights)
+
+        grad_vars = deeplab_model.trainable_weights
+
+        optimizer = Adam(lr=7e-4)
+        zero_grads = [tf.zeros_like(w) for w in grad_vars]
+
+        # Apply gradients which don't do nothing with Adam
+        optimizer.apply_gradients(zip(zero_grads, grad_vars))
+
+        # Set the weights of the optimizer
+        optimizer.set_weights(weight_values)
+
+        deeplab_model.optimizer.set_weights(weight_values) """
+        
+    deeplab_model.compile(optimizer = Adam(lr=7e-4, epsilon=1e-8, decay=1e-6), sample_weight_mode = "temporal",
+            loss = losses, metrics = metrics)
+
     return deeplab_model
     
 
@@ -89,24 +114,31 @@ def train(model, dataset_path, batch_size, freezed, epochs, name):
     train_generator = SegClass.create_generators(dataset = dataset_path, blur=0, mode='train',
                                                     n_classes=19, horizontal_flip=False, vertical_flip=False, 
                                                     brightness=0, rotation=False, zoom=0, batch_size=batch_size,
-                                                    seed=7, do_ahisteq=False, random_crop=True)
+                                                    seed=7, do_ahisteq=False, random_crop=True, resize_shape=image_size)
 
     valid_generator = SegClass.create_generators(dataset =dataset_path, blur=0, mode='val',
                                                     n_classes=19, horizontal_flip=False, vertical_flip=False, 
                                                     brightness=0, rotation=False, zoom=0, batch_size=batch_size,
-                                                    seed=7, do_ahisteq=False)
+                                                    seed=7, do_ahisteq=False, resize_shape=image_size)
 
     history = SegClass.train_generator(model, train_generator, valid_generator, callbacks, mp = True)
 
 
 if __name__ == "__main__":
     args = parser.parse_args()
+    global image_size
+    image_size = (512,512)
 
     if args.model_folder:
-        model = load_model(args.output_log, args.model_folder)
+        model = load_model(args.model_folder)
     elif args.model:
-        model = build_model(args.model, args.pretrained)
+        if args.input_size:
+            model = build_model(args.model, args.pretrained, (args.input_size[0], args.input_size[1], 3))
+        else:
+            model = build_model(args.model, args.pretrained)
     else:
         raise Exception("No model or model_folder was definied. Run --help for more details.")
-    
+    if args.input_size:
+        image_size = (args.input_size[0], args.input_size[1])
+
     train(model, args.dataset, args.batch_size, args.freezed, args.epochs, args.name)

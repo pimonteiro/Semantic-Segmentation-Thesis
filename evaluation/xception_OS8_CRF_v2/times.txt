@@ -1,0 +1,10 @@
+Scene 2: 6905.4741151332855s / 2:30h
+Scene 3: 631.8915450572968s / 15m
+
+Total: 7537.365660190582 / 2:45h
+
+
+
+OS: 8
+Backbone: Xception
+Normalizaton: [0,1]
