@@ -28,13 +28,14 @@ parser.add_argument('--dataset', type=str, required=True, help="Dataframe contai
 parser.add_argument('--batch_size', type=int, required=True, help="Batch size for the training.")
 parser.add_argument('--epochs', type=int, required=True, help="Number of epochs for training.")
 parser.add_argument('--name', type=str, required=True, help="Name for the ouput log dir.")
-parser.add_argument('--input_size', type=int, nargs=2, help='Input size for the model.')
+parser.add_argument('--input_size', type=int, nargs=2, help="Input size for the model.")
+parser.add_argument('--lr', type=float, default=0.0001, help="Learning rate of the model.")
 
 gpus = tf.config.list_physical_devices('GPU')
 for gpu in gpus:
     tf.config.experimental.set_memory_growth(gpu, True)
 
-def build_model(model_name, pretrained, input_size=(512,512,3)):
+def build_model(model_name, pretrained, input_size=(512,512,3), lr=0.0001):
     if pretrained:
         weights = 'cityscapes'
     else:
@@ -44,7 +45,7 @@ def build_model(model_name, pretrained, input_size=(512,512,3)):
     except:
         raise Exception("No model with given backbone: ", model_name)
 
-    deeplab_model.compile(optimizer = Adam(lr=7e-4, epsilon=1e-8, decay=1e-6), sample_weight_mode = "temporal",
+    deeplab_model.compile(optimizer = Adam(lr=lr, epsilon=1e-8, decay=1e-6), sample_weight_mode = "temporal",
               loss = losses, metrics = metrics)
     
     return deeplab_model
@@ -71,7 +72,7 @@ def load_model(path):
 
         deeplab_model.optimizer.set_weights(weight_values) """
         
-    deeplab_model.compile(optimizer = Adam(lr=7e-4, epsilon=1e-8, decay=1e-6), sample_weight_mode = "temporal",
+    deeplab_model.compile(optimizer = Adam(lr=0.0001, epsilon=1e-8, decay=1e-6), sample_weight_mode = "temporal",
             loss = losses, metrics = metrics)
 
     return deeplab_model
@@ -82,7 +83,7 @@ def build_callbacks(output_log, tf_board = False):
                         write_graph=False, write_images = False)
     checkpointer = tf.keras.callbacks.ModelCheckpoint(filepath = '../weights/'+output_log+'/'+output_log+'_model.{epoch:02d}-{val_loss:.2f}-{val_Jaccard:.2f}.h5', verbose=1, save_best_only=False, save_weights_only=False,
                                     monitor = 'val_{}'.format(monitor), mode = mode)
-    stop_train = tf.keras.callbacks.EarlyStopping(monitor = 'val_{}'.format(monitor), patience=100, verbose=1, mode = mode)
+    stop_train = tf.keras.callbacks.EarlyStopping(monitor = 'val_{}'.format(monitor), patience=7, verbose=1, mode = mode)   #100
     reduce_lr = tf.keras.callbacks.ReduceLROnPlateau(monitor = 'val_{}'.format(monitor), factor=0.5,
                 patience=5, min_lr=1e-6)
     if tf_board:
@@ -129,16 +130,16 @@ if __name__ == "__main__":
     global image_size
     image_size = (512,512)
 
-    if args.model_folder:
+    if args.model_folder is not None:
         model = load_model(args.model_folder)
-    elif args.model:
-        if args.input_size:
-            model = build_model(args.model, args.pretrained, (args.input_size[0], args.input_size[1], 3))
+    elif args.model is not None:
+        if args.input_size is not None:
+            model = build_model(args.model, args.pretrained, (args.input_size[0], args.input_size[1], 3), args.lr)
         else:
             model = build_model(args.model, args.pretrained)
     else:
         raise Exception("No model or model_folder was definied. Run --help for more details.")
-    if args.input_size:
+    if args.input_size is not None:
         image_size = (args.input_size[0], args.input_size[1])
 
     train(model, args.dataset, args.batch_size, args.freezed, args.epochs, args.name)

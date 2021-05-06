@@ -1,0 +1,2 @@
+Model specs: ../weights/xception_retrained_375_0001_rndcrop_infinite/xception_retrained_375_0001_rndcrop_infinite_model.21-0.27-0.53.h5
+Class: []

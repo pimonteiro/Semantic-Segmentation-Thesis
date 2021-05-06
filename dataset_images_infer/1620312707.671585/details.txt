@@ -1,0 +1,2 @@
+Model specs: ../weights/mobilenetv2_retrained_375_0001lr_rndcrop_infinite/mobilenetv2_retrained_375_0001lr_rndcrop_infinite_model.04-0.34-0.45.h5
+Class: []

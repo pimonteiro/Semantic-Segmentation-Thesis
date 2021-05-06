@@ -27,9 +27,10 @@ parser.add_argument('--norm', type=int, required=False, help="Normalization meth
 parser.add_argument('--dataset', type=str, required=False, help="Dataframe containing the dataset two columns: the class (type) and respective image path (image).")
 parser.add_argument('--use_crf', default=False, action='store_true', help="Use CRF to clear model output.")
 parser.add_argument('--image', type=str, required=False, help="Infer on a single image.")
-parser.add_argument('--type', type=int, required=False, help="Class to focus on inferention.")
+parser.add_argument('--type', type=int, nargs='+', required=False, default=[], help="Class to focus on inferention.")
 parser.add_argument('--n', type=int, required=False, help="Number of images to classify (default 5).")
 parser.add_argument('--override', default=False, action='store_true', help="Flag to use the whole dataset and not only test subset.")
+parser.add_argument('--seed', type=int, default=7, required=False, help="Random seed for sampling the images from the dataset.")
 
 
 keras_deeplab = importlib.import_module("keras-deeplab-v3-plus.model")
@@ -50,13 +51,10 @@ def build_model(model_name, os, alpha, norm):
               loss = losses, metrics = metrics)
     return deeplab_model
 
-def load_model(path):
-    deeplab_model = tf.keras.models.load_model(path, custom_objects={
-        'sparse_crossentropy_ignoring_last_label': sparse_crossentropy_ignoring_last_label,
-        'Jaccard': Jaccard
-        })
+def load_model(path, model):
+    model.load_weights(path)
 
-    return deeplab_model
+    return model
 
 def mIOU(gt, preds):
     ulabels = np.unique(gt)
@@ -69,7 +67,7 @@ def mIOU(gt, preds):
 
 
 def infer_single_image(model, image_path, user_crf, model_name):
-    output = "single_images_infer/" + str(time.time())
+    output = "../single_images_infer/" + str(time.time())
     os.makedirs(os.path.abspath(output))
     with open(output + '/details.txt', 'w') as f:
         f.write("Model specs: " + model_name)
@@ -96,21 +94,32 @@ def infer_single_image(model, image_path, user_crf, model_name):
     
     vis_segmentation(image,labels, output + "/overlay.png")
 
-def infer_dataset_classe(model, dataset_path, use_crf, type, n, model_name, flag):
-    random.seed(7)
+def infer_dataset_classe(model, dataset_path, use_crf, type, n, model_name, flag, seed):
+    random.seed(seed)
     data = pd.read_csv(dataset_path)
-    data = data[data['type'] == type]
+
+    for t in type:
+        data = data[data[str(t)] == 1]
+        if data.empty:
+            raise Exception("No existing images containing all the types including: " + str(t))
+
+    
     tmp_data = data[data['scene'].str.contains('0003') | data['scene'].str.contains('0004')]
 
-    if data.empty:
+    if tmp_data.empty:
         if not flag:
             raise Exception("Class requested not available on test subset. Use flag --override to override this condition and use the whole dataset.")
         else:
-            tmp_data = data[data['type'] == type]
-    
-    samples = tmp_data.sample(n = n)
+            # Trys to fallback to validation subset, as it is not used directly on training
+            tmp_data = data[data['scene'].str.contains('0005') | data['scene'].str.contains('0007')]
 
-    output = "dataset_images_infer/" + str(time.time()) + "/"
+            if tmp_data.empty:
+                print("Failed to fallback to validation subset. Now using training data.")
+                tmp_data = data
+
+    samples = tmp_data.sample(n = n, random_state=seed)
+
+    output = "../dataset_images_infer/" + str(time.time()) + "/"
     os.makedirs(os.path.abspath(output))
 
     with open(output + 'details.txt', 'w') as f:
@@ -137,6 +146,8 @@ def infer_dataset_classe(model, dataset_path, use_crf, type, n, model_name, flag
         vis_segmentation(image,labels, tmp_output + "/overlay_resized.png")
         
         with open(tmp_output + '/details.txt', 'w') as f:
+            f.write("Image: " + str(samples.iloc[i].image))
+            f.write("\n")
             f.write("Image location: " + str(samples.iloc[i].scene))
             f.write("\n")
             
@@ -159,9 +170,17 @@ if __name__ == "__main__":
     new_os = 8
     new_alpha= 1.
     new_norm = 1
-    model_name = 'xception'
-    if args.model_folder  is not None:
-        model = load_model(args.model_folder)
+    model_name = ''
+    if args.model_folder is not None:
+        if 'xception' in args.model_folder:
+            model_name = 'xception'
+        elif 'mobilenet' in args.model_folder:
+            model_name = 'mobilenetv2'
+        else:
+            raise Exception("Unknown model architecture.")
+
+        model = build_model(model_name, new_os, new_alpha, new_norm)
+        model = load_model(args.model_folder, model)
         model_name = args.model_folder
 
     elif args.model  is not None:
@@ -171,7 +190,7 @@ if __name__ == "__main__":
             new_alpha = args.alpha
         if args.norm is not None:
             new_norm = args.norm
-
+        model_name = args.model
         model = build_model(args.model, new_os, new_alpha, new_norm)
     else:
         raise Exception("No model or model_folder was definied. Run --help for more details.")
@@ -179,10 +198,8 @@ if __name__ == "__main__":
     if args.image  is not None:
         infer_single_image(model, args.image, args.use_crf, model_name)
     elif args.dataset is not None:
-        if args.type is None:
-            raise Exception("Parameter --class required. Run --help for more details.")
         n = 5 if not args.n else args.n
 
-        infer_dataset_classe(model, args.dataset, args.use_crf, args.type, n, model_name, args.override)
+        infer_dataset_classe(model, args.dataset, args.use_crf, args.type, n, model_name, args.override, args.seed)
     else:
         raise Exception("No image or dataset provided. Run --help for more details.")

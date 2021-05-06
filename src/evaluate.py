@@ -16,8 +16,6 @@ keras_deeplab = importlib.import_module("keras-deeplab-v3-plus.model")
 
 import Keras_segmentation_deeplab_v3_1.utils
 
-image_size = (512,512)
-
 losses = sparse_crossentropy_ignoring_last_label
 metrics = {'pred_mask' : [Jaccard]}
 
@@ -31,6 +29,8 @@ parser.add_argument('--dataset', type=str, required=True, help="Dataframe contai
 parser.add_argument('--batch_size', type=int, required=True, help="Batch size for the training.")
 parser.add_argument('--output', type=str, required=True, help="Output destination for the resulted evaluation. Created if not present")
 parser.add_argument('--use_crf', default=False, action='store_true', help="Use CRF to clear model output.")
+parser.add_argument('--input_size', type=int, nargs=2, help="Input size for the model.")
+
 
 def _compute_mean_iou_and_dice(total_cm, obj):
     """Compute the mean intersection-over-union via the confusion matrix."""
@@ -103,7 +103,7 @@ def _compute_accuracy(total_cm, obj):
 
 def build_model(model_name, os, alpha, norm):
     try:
-        deeplab_model = keras_deeplab.Deeplabv3(backbone=model_name, input_shape=(512, 512, 3), classes=19, weights='cityscapes', OS=os, alpha=alpha, infer=True, normalization=norm)
+        deeplab_model = keras_deeplab.Deeplabv3(backbone=model_name, input_shape=(image_size[0], image_size[1], 3), classes=19, weights='cityscapes', OS=os, alpha=alpha, infer=True, normalization=norm)
     except:
         raise Exception("No model with given backbone: ", model_name)
 
@@ -133,7 +133,7 @@ def evaluate(model, dataset_path, output, batch_size, use_crf, params):
         test_generator = SegClass.create_generators(dataset =dataset_path, subscene=s, blur=0, mode='test',
                                                     n_classes=19, horizontal_flip=False, vertical_flip=False, 
                                                     brightness=0, rotation=False, zoom=0, batch_size=batch_size,
-                                                    seed=7, do_ahisteq=False)
+                                                    seed=7, do_ahisteq=False, resize_shape=image_size)
         
         conf_m = np.zeros((19, 19), dtype=float)
         progress = 0.0
@@ -150,8 +150,9 @@ def evaluate(model, dataset_path, output, batch_size, use_crf, params):
             
             if use_crf:
                 for i in range(batch_size):
-                    crf_mask = Keras_segmentation_deeplab_v3_1.utils.do_crf(x[i].astype('uint8'),mask[i], zero_unsure=False)
-                    mask[i] = crf_mask
+                    tmp = mask[i].reshape((image_size))
+                    crf_mask = Keras_segmentation_deeplab_v3_1.utils.do_crf(x[i].astype('uint8'),tmp, zero_unsure=False)
+                    mask[i] = np.ravel(crf_mask)
 
             flat_pred = np.ravel(mask).astype('int')
             flat_label = np.ravel(label).astype('int')
@@ -190,12 +191,17 @@ def evaluate(model, dataset_path, output, batch_size, use_crf, params):
 
 if __name__ == "__main__":
     args = parser.parse_args()
+    global image_size
+    image_size = (512,512)  
 
     new_os = 8
     new_alpha= 1.
     new_norm = 1
 
     params = {}
+
+    if args.input_size is not None:
+            image_size = (args.input_size[0], args.input_size[1])
 
     if args.model_folder  is not None:
         model = load_model(args.model_folder)
@@ -207,7 +213,8 @@ if __name__ == "__main__":
             new_alpha = args.alpha
         if args.norm is not None:
             new_norm = args.norm
-
+        
+        print(new_norm)
         model = build_model(args.model, new_os, new_alpha, new_norm)
     else:
         raise Exception("No model or model_folder was definied. Run --help for more details.")
@@ -215,6 +222,7 @@ if __name__ == "__main__":
     params['Backbone'] = args.model
     params['OS'] = new_os
     params['Alpha'] = new_alpha
+    params['Input'] = image_size
     if new_norm == 1:
         params['Normalization'] = "[0,1]"
     else:

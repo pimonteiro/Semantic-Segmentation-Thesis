@@ -1,0 +1,3 @@
+Image: 0000003460.png
+Image location: /2013_05_28_drive_0004_sync
+mIOU: 0.08

@@ -1,0 +1,1 @@
+python train.py --model xception --dataset ../kitti360_dataset.csv --batch_size 4 --epochs 30 --name xception_retrained_375_0001lr_rndcrop_infinite --pretrained --input_size 375 513

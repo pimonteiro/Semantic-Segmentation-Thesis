@@ -1,0 +1,1 @@
+python train.py --model xception --dataset ../kitti360_dataset.csv --batch_size 2 --epochs 8 --name xception_freezed_finetune_4_v2_continuous --pretrained --freezed
