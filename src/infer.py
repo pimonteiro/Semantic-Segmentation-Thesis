@@ -35,7 +35,7 @@ parser.add_argument('--seed', type=int, default=7, required=False, help="Random 
 
 keras_deeplab = importlib.import_module("keras-deeplab-v3-plus.model")
 
-image_size = (512,512)
+image_size = (375,513)
 
 losses = sparse_crossentropy_ignoring_last_label
 metrics = {'pred_mask' : [Jaccard]}
@@ -74,11 +74,18 @@ def infer_single_image(model, image_path, user_crf, model_name):
         f.write("\n")
         f.write("Image location:" + image_path)
     
+    options = tf.profiler.experimental.ProfilerOptions(host_tracer_level = 3,
+                                                python_tracer_level = 1,
+                                                device_tracer_level = 1)
+
+
     image = cv2.imread(image_path, 3)
     old_shape = image.shape
     image = cv2.resize(image, image_size)
 
+    tf.profiler.experimental.start(output + '/logdir', options)
     pred = model.predict(np.expand_dims(image, axis=0))
+    tf.profiler.experimental.stop()
     labels = np.argmax(pred.squeeze(), -1)
 
     cv2.imwrite(output + "/image_resized.png",image)

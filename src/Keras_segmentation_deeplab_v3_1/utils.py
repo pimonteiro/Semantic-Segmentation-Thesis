@@ -157,6 +157,20 @@ def get_CITYSCAPES_classes():
     }
     return CITYSCAPES_classes
 
+def get_CITYSCAPES_classes_reduced():
+    CITYSCAPES_classes = {
+        0: 'road', 
+        1: 'sidewalk', 
+        2: 'traffic light', 
+        3: 'traffic sign',
+        4: 'person', 
+        5: 'rider', 
+        6: 'vehicle', 
+        7: 'motorcycle', 
+        8: 'bicycle',
+    }
+    return CITYSCAPES_classes
+
 
 def sparse_crossentropy_ignoring_last_label(y_true, y_pred):
     nb_classes = K.int_shape(y_pred)[-1]

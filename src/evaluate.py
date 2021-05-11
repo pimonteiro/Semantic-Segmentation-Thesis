@@ -9,8 +9,13 @@ import os
 import sys
 import time
 import json
+from datetime import datetime
+import random
+
+from tensorflow.keras import callbacks
 
 from utils.keras_functions import sparse_crossentropy_ignoring_last_label, Jaccard
+from utils.data.labels import grouped_labels_conversion_ids
 
 keras_deeplab = importlib.import_module("keras-deeplab-v3-plus.model")
 
@@ -30,6 +35,7 @@ parser.add_argument('--batch_size', type=int, required=True, help="Batch size fo
 parser.add_argument('--output', type=str, required=True, help="Output destination for the resulted evaluation. Created if not present")
 parser.add_argument('--use_crf', default=False, action='store_true', help="Use CRF to clear model output.")
 parser.add_argument('--input_size', type=int, nargs=2, help="Input size for the model.")
+
 
 
 def _compute_mean_iou_and_dice(total_cm, obj):
@@ -136,6 +142,9 @@ def evaluate(model, dataset_path, output, batch_size, use_crf, params):
                                                     seed=7, do_ahisteq=False, resize_shape=image_size)
         
         conf_m = np.zeros((19, 19), dtype=float)
+        
+        conf_m_reduced = np.zeros((19,19), dtype=float)
+
         progress = 0.0
         print("Progress: {:>3} %".format( progress * 100 / len(test_generator) ), end=' ')
         time_start = time.time()
@@ -161,22 +170,45 @@ def evaluate(model, dataset_path, output, batch_size, use_crf, params):
                 if l == 255:        #label to ignore
                     continue
                 if l < 19 and p < 19:
-                    conf_m[l-1, p-1] += 1
-                #else:
-                    #print('Invalid entry encountered, skipping! Label: ', l,
-                    #       ' Prediction: ', p)
+                    conf_m[l, p] += 1
+
+                    # Group of classes
+                    if p in [13,14,15] and l in [13,14,15]:
+                        conf_m_reduced[13, 13] += 1
+                    elif l in [13,14,15]:
+                        conf_m_reduced[13, p] += 1
+                    elif p in [13,14,15]:
+                        conf_m_reduced[l,13] += 1
+                    else:
+                        conf_m_reduced[l,p] += 1
+
+                else:
+                    print('Invalid entry encountered, skipping! Label: ', l,
+                          ' Prediction: ', p)
             progress += 1
             print("\rProgress: {:>3} %".format( progress * 100 / len(test_generator) ), end=' ')
             sys.stdout.flush()
 
+
         time_end = time.time()
+
+        # Reducing the confusion matrix
+        conf_m_reduced = np.delete(conf_m_reduced, [2,3,4,5,8,9,10,14,15,16], 0)
+        conf_m_reduced = np.delete(conf_m_reduced, [2,3,4,5,8,9,10,14,15,16], 1)
 
         scene_metrics = {}
         scene_metrics['n_images'] = test_generator.true_len()
         scene_metrics['runtime'] = time_end - time_start
+        standard_res = {}
 
-        scene_metrics = _compute_mean_iou_and_dice(conf_m, scene_metrics)
-        scene_metrics = _compute_accuracy(conf_m, scene_metrics)
+        standard_res = _compute_mean_iou_and_dice(conf_m, standard_res)
+        standard_res = _compute_accuracy(conf_m, standard_res)
+        scene_metrics['standard'] = standard_res
+
+        specific_res = {}
+        specific_res = _compute_mean_iou_and_dice(conf_m_reduced, specific_res)
+        specific_res = _compute_accuracy(conf_m_reduced, specific_res)
+        scene_metrics['specific'] = specific_res
 
         metrics['scene' + str(s)] = scene_metrics
 
@@ -185,6 +217,13 @@ def evaluate(model, dataset_path, output, batch_size, use_crf, params):
         cm1 = Keras_segmentation_deeplab_v3_1.utils.plot_confusion_matrix(conf_m, classes, normalize=True)
         plt.title('DeepLab\nScene ' + str(s))
         plt.savefig(output + '/' + 'scene ' + str(s) + '.png')
+
+        classes = [c for c in Keras_segmentation_deeplab_v3_1.utils.get_CITYSCAPES_classes_reduced().values()]
+        plt.figure(figsize=(12,8))
+        cm1 = Keras_segmentation_deeplab_v3_1.utils.plot_confusion_matrix(conf_m_reduced, classes, normalize=True)
+        plt.title('DeepLab\nScene ' + str(s))
+        plt.savefig(output + '/' + 'scene ' + str(s) + '_reduced.png')
+
     
     with open(output + '/metrics.json', 'w', encoding='utf-8') as f:
         json.dump(metrics, f, ensure_ascii=False, indent=4)

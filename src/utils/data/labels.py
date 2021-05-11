@@ -113,3 +113,15 @@ def convert_id_to_training_id(id):
 
 def convert_training_id_to_id(id):
   return trainId2label[id].kittiId
+
+grouped_labels_conversion_ids = {
+    0: 0,
+    1: 1,
+    6: 2,
+    7: 3,
+    11: 4,
+    12: 5,
+    13: 6,
+    17: 7,
+    18: 8
+}
