@@ -43,7 +43,7 @@ metrics = {'pred_mask' : [Jaccard]}
 
 def build_model(model_name, os, alpha, norm):
     try:
-        deeplab_model = keras_deeplab.Deeplabv3(backbone=model_name, input_shape=(512, 512, 3), classes=19, weights='cityscapes', OS=os, alpha=alpha, infer=True, normalization=norm)
+        deeplab_model = keras_deeplab.Deeplabv3(backbone=model_name, input_shape=(513, 375, 3), classes=19, weights='cityscapes', OS=os, alpha=alpha, infer=True, normalization=norm)
     except:
         raise Exception("No model with given backbone: ", model_name)
 
