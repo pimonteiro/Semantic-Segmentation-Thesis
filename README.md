@@ -95,19 +95,22 @@ $ python evaluate.py --dataset path/do/dataset --model_folder ... --batch_size .
 Training the model follows the same logic as evaluation:
 
 ```
-$ python evaluate.py --dataset path/do/dataset --model {xception,mobilenetv2} --pretrained --freezed  --batch_size ... --epoch ... --name ...
+$ python train.py --dataset path/do/dataset --model {xception,mobilenetv2} --pretrained --freezed  --batch_size ... --epoch ... --name ...
 
 or
 
-$ python evaluate.py --dataset path/do/dataset --model_folder ... --pretrained --freezed  --batch_size ... --epoch ... --name ...```
+$ python train.py --dataset path/do/dataset --model_folder ... --pretrained --freezed  --batch_size ... --epoch ... --name ...```
 ```
 
 The ```--pretrained``` refers to using the pretrained version of the backbone model with cityscapes weights and ```--freezed``` refers to freezing all layers up until the final ones to refine the output.
 
 Running the training script will generate two folders: __logs__ containing the tensorboard logs from the training and __weights__ containing the best weights achieved during training.
 
+## Inference of the model
 
-## Using the model
+User __infer.py__ for running inferences with the models. One needs to specify a model/model weight and can optionally infer a given image or randomly select from the dataset used.
+
+# Using the model externally
 
 You may download the whole repository and follow the function __load_Model__ to load the model (using the same imports as the file) or try and directly use the weights available for download here:
 https://drive.google.com/drive/folders/14qR_XPkYxVM_Ixrx2fZP_dv1m5fiHWqj?usp=sharing
