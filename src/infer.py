@@ -10,12 +10,13 @@ import cv2
 import random
 import matplotlib.pyplot as plt
 import matplotlib
+from tensorflow.python.ops.gen_array_ops import deep_copy
 from utils.keras_functions import sparse_crossentropy_ignoring_last_label, Jaccard
 from viewer.label_visualizer import vis_segmentation
+from tensorflow.python.saved_model import tag_constants
 
-matplotlib.use('TkAgg')
-
-import Keras_segmentation_deeplab_v3_1.utils
+from tensorflow.keras import mixed_precision
+mixed_precision.set_global_policy('mixed_float16')
 
 
 parser = argparse.ArgumentParser()
@@ -31,11 +32,13 @@ parser.add_argument('--type', type=int, nargs='+', required=False, default=[], h
 parser.add_argument('--n', type=int, required=False, help="Number of images to classify (default 5).")
 parser.add_argument('--override', default=False, action='store_true', help="Flag to use the whole dataset and not only test subset.")
 parser.add_argument('--seed', type=int, default=7, required=False, help="Random seed for sampling the images from the dataset.")
+parser.add_argument('--tensorrt', default=False, action='store_true', help='Flag to enable tensorrt support.')
+parser.add_argument('--load_directly', default=False, action='store_true', help='Flag to directly load the model instead of building it and then loading the weights. Used for the pruned model.')
 
 
 keras_deeplab = importlib.import_module("keras-deeplab-v3-plus.model")
 
-image_size = (375,513)
+image_size = (513,375)
 
 losses = sparse_crossentropy_ignoring_last_label
 metrics = {'pred_mask' : [Jaccard]}
@@ -43,7 +46,7 @@ metrics = {'pred_mask' : [Jaccard]}
 
 def build_model(model_name, os, alpha, norm):
     try:
-        deeplab_model = keras_deeplab.Deeplabv3(backbone=model_name, input_shape=(513, 375, 3), classes=19, weights='cityscapes', OS=os, alpha=alpha, infer=True, normalization=norm)
+        deeplab_model = keras_deeplab.Deeplabv3(backbone=model_name, input_shape=(375, 513, 3), classes=19, weights='cityscapes', OS=os, alpha=alpha, infer=True, normalization=norm)
     except:
         raise Exception("No model with given backbone: ", model_name)
 
@@ -51,10 +54,30 @@ def build_model(model_name, os, alpha, norm):
               loss = losses, metrics = metrics)
     return deeplab_model
 
-def load_model(path, model):
-    model.load_weights(path)
+def load_model(name, os, alpha, norm, path, load_directly):
+    if not load_directly:
+        deeplab_model = build_model(name, os, alpha, norm)
+        deeplab_model.load_weights(path)
 
-    return model
+    else:
+        #deeplab_model = tf.keras.models.load_model(path)
+        deeplab_model = build_model(name, os, alpha, norm)
+        deeplab_model.load_weights(path)
+
+
+    return deeplab_model
+
+
+def load_model_trt(path):
+    saved_model_loaded = tf.saved_model.load(path, tags=[tag_constants.SERVING])
+    infer = saved_model_loaded.signatures['serving_default']
+
+    #data_build = np.zeros((1, image_size[1], image_size[0], 3), dtype='float32')
+    #inp = tf.constant(data_build)
+    #print("Preping model for prediction....")
+    #infer(inp)
+    #print("Model ready for prediction!")
+    return infer
 
 def mIOU(gt, preds):
     ulabels = np.unique(gt)
@@ -66,8 +89,9 @@ def mIOU(gt, preds):
     return np.round(iou.mean(), 2)
 
 
-def infer_single_image(model, image_path, user_crf, model_name):
+def infer_single_image(model, image_path, user_crf, model_name, tensorrt_flag, load_directly):
     output = "../single_images_infer/" + str(time.time())
+    
     os.makedirs(os.path.abspath(output))
     with open(output + '/details.txt', 'w') as f:
         f.write("Model specs: " + model_name)
@@ -79,14 +103,26 @@ def infer_single_image(model, image_path, user_crf, model_name):
                                                 device_tracer_level = 1)
 
 
-    image = cv2.imread(image_path, 3)
+    image = cv2.imread(image_path, 1)
     old_shape = image.shape
     image = cv2.resize(image, image_size)
 
-    tf.profiler.experimental.start(output + '/logdir', options)
-    pred = model.predict(np.expand_dims(image, axis=0))
-    tf.profiler.experimental.stop()
-    labels = np.argmax(pred.squeeze(), -1)
+    x = np.expand_dims(image, axis=0)
+    x = x.astype('float32')
+    #tf.profiler.experimental.start(output + '/logdir', options)
+
+    if tensorrt_flag:
+        inp = tf.constant(x)
+        preds = model(inp)
+        labels = np.argmax(preds[list(preds.keys())[0]].numpy(), axis=-1)
+    else:
+        preds = model.predict(x)
+        labels = np.argmax(preds.squeeze(), axis=-1)
+
+    #tf.profiler.experimental.stop()
+
+    #if load_directly:
+    #    labels = np.reshape(labels, image_size)
 
     cv2.imwrite(output + "/image_resized.png",image)
     cv2.imwrite(output + "/labels_resized.png",labels)
@@ -101,7 +137,7 @@ def infer_single_image(model, image_path, user_crf, model_name):
     
     vis_segmentation(image,labels, output + "/overlay.png")
 
-def infer_dataset_classe(model, dataset_path, use_crf, type, n, model_name, flag, seed):
+def infer_dataset_classe(model, dataset_path, use_crf, type, n, model_name, flag, seed, tensorrt_flag):
     random.seed(seed)
     data = pd.read_csv(dataset_path)
 
@@ -144,8 +180,15 @@ def infer_dataset_classe(model, dataset_path, use_crf, type, n, model_name, flag
         old_shape = image.shape
         image = cv2.resize(image, image_size)
 
-        pred = model.predict(np.expand_dims(image, axis=0))
-        labels = np.argmax(pred.squeeze(), -1)
+        x = np.expand_dims(image, axis=0)
+
+        if tensorrt_flag:
+            inp = tf.constant(x)
+            preds = model(inp)
+            labels = np.argmax(preds[list(preds.keys())[0]].numpy(), axis=-1)
+        else:
+            preds = model.predict(x)
+            labels = np.argmax(preds.squeeze(), axis=-1)
 
         cv2.imwrite(tmp_output + "/image_resized.png",image)
         cv2.imwrite(tmp_output + "/labels_resized.png",labels)
@@ -177,17 +220,18 @@ if __name__ == "__main__":
     new_os = 8
     new_alpha= 1.
     new_norm = 1
-    model_name = ''
-    if args.model_folder is not None:
+    model_name = 'xception'
+    if args.tensorrt is True:
+        model = load_model_trt(args.model_folder)
+    elif args.model_folder is not None:
         if 'xception' in args.model_folder:
             model_name = 'xception'
         elif 'mobilenet' in args.model_folder:
             model_name = 'mobilenetv2'
-        else:
+        elif not args.load_directly:
             raise Exception("Unknown model architecture.")
-
-        model = build_model(model_name, new_os, new_alpha, new_norm)
-        model = load_model(args.model_folder, model)
+        
+        model = load_model(model_name, new_os, new_alpha, new_norm, args.model_folder, args.load_directly)
         model_name = args.model_folder
 
     elif args.model  is not None:
@@ -203,10 +247,10 @@ if __name__ == "__main__":
         raise Exception("No model or model_folder was definied. Run --help for more details.")
     
     if args.image  is not None:
-        infer_single_image(model, args.image, args.use_crf, model_name)
+        infer_single_image(model, args.image, args.use_crf, model_name, args.tensorrt, args.load_directly)
     elif args.dataset is not None:
         n = 5 if not args.n else args.n
 
-        infer_dataset_classe(model, args.dataset, args.use_crf, args.type, n, model_name, args.override, args.seed)
+        infer_dataset_classe(model, args.dataset, args.use_crf, args.type, n, model_name, args.override, args.seed, args.tensorrt)
     else:
         raise Exception("No image or dataset provided. Run --help for more details.")

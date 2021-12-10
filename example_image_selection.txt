@@ -1,0 +1,11 @@
+
+# Shadow problem
+/mnt/7BCDA59C6DEFFE3C/KITTI-360/data_2d_raw/2013_05_28_drive_0009_sync/image_00/data_rect/0000006155.png
+/mnt/7BCDA59C6DEFFE3C/KITTI-360/data_2d_raw/2013_05_28_drive_0010_sync/image_00/data_rect/0000000202.png
+/mnt/7BCDA59C6DEFFE3C/KITTI-360/data_2d_raw/2013_05_28_drive_0003_sync/image_00/data_rect/0000000899.png
+
+
+# Example
+/mnt/7BCDA59C6DEFFE3C/KITTI-360/data_2d_raw/2013_05_28_drive_0010_sync/image_00/data_rect/0000000506.png
+/mnt/7BCDA59C6DEFFE3C/KITTI-360/data_2d_raw/2013_05_28_drive_0002_sync/image_00/data_rect/0000010179.png
+/mnt/7BCDA59C6DEFFE3C/KITTI-360/data_2d_raw/2013_05_28_drive_0010_sync/image_00/data_rect/0000002211.png

@@ -105,3 +105,31 @@ $ python evaluate.py --dataset path/do/dataset --model_folder ... --pretrained -
 The ```--pretrained``` refers to using the pretrained version of the backbone model with cityscapes weights and ```--freezed``` refers to freezing all layers up until the final ones to refine the output.
 
 Running the training script will generate two folders: __logs__ containing the tensorboard logs from the training and __weights__ containing the best weights achieved during training.
+
+
+## Using the model
+
+You may download the whole repository and follow the function __load_Model__ to load the model (using the same imports as the file) or try and directly use the weights available for download here:
+https://drive.google.com/drive/folders/14qR_XPkYxVM_Ixrx2fZP_dv1m5fiHWqj?usp=sharing
+
+Be careful that with hight traffic Google might temporarily disable the access to the drive.
+
+
+
+# Disclaimer
+
+Given the time difference between the original code and this adaptation, it was not possible for me to validate all the versions needed for running the code. As such, I suggest you follow the requirements on the Dockerfile, as it was the environment I used to develop all the code.
+
+# Credits
+
+If you use this code for your work, please mention it using the following citation:
+
+```bibtex
+@article{segm_on_sensors,
+  title={Application of Semantic Segmentation through data acquired from sensors},
+  author={Filipe Monteiro},
+  #journal={The Computer Journal},
+  year={2021},
+  #publisher={Oxford University Press}
+}
+```

@@ -1,0 +1,18 @@
+version: '3.3'
+
+services:
+    my_ml_container:
+        image: my_ml_container
+        ports:
+            - 8888:8888
+            - 6006:6006
+        deploy:
+            resources:
+                reservations:
+                    devices:
+                    - capabilities: [gpu]
+        volumes:
+            - "/home/pimonteiro/repos/Semantic-Segmentation-Thesis/:/workspace/:Z"
+            - "/mnt/7BCDA59C6DEFFE3C/:/mnt/7BCDA59C6DEFFE3C/"
+        tty: true
+        stdin_open: true

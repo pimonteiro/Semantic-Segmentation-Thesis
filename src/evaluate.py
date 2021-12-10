@@ -10,12 +10,12 @@ import sys
 import time
 import json
 from datetime import datetime
-import random
+from tensorflow.python.saved_model import tag_constants
 
-from tensorflow.keras import callbacks
+from tensorflow.keras import mixed_precision
+mixed_precision.set_global_policy('mixed_float16')
 
 from utils.keras_functions import sparse_crossentropy_ignoring_last_label, Jaccard
-from utils.data.labels import grouped_labels_conversion_ids
 
 keras_deeplab = importlib.import_module("keras-deeplab-v3-plus.model")
 
@@ -35,6 +35,8 @@ parser.add_argument('--batch_size', type=int, required=True, help="Batch size fo
 parser.add_argument('--output', type=str, required=True, help="Output destination for the resulted evaluation. Created if not present")
 parser.add_argument('--use_crf', default=False, action='store_true', help="Use CRF to clear model output.")
 parser.add_argument('--input_size', type=int, nargs=2, help="Input size for the model.")
+parser.add_argument('--tensorrt', default=False, action='store_true', help='Flag to enable tensorrt support.')
+parser.add_argument('--load_directly', default=False, action='store_true', help='Flag to directly load the model instead of building it and then loading the weights. Used for the pruned model.')
 
 
 
@@ -117,15 +119,27 @@ def build_model(model_name, os, alpha, norm):
               loss = losses, metrics = metrics)
     return deeplab_model
 
-def load_model(path):
-    deeplab_model = tf.keras.models.load_model(path, custom_objects={
-        'sparse_crossentropy_ignoring_last_label': sparse_crossentropy_ignoring_last_label,
-        'Jaccard': Jaccard
-        })
-
+def load_model(name, os, alpha, norm, path, load_directly):
+    if not load_directly:
+        deeplab_model = build_model(name, os, alpha, norm)
+        deeplab_model.load_weights(path)
+    else:
+        deeplab_model = tf.keras.models.load_model(path)
+    
     return deeplab_model
 
-def evaluate(model, dataset_path, output, batch_size, use_crf, params):
+def load_model_trt(path, batch_size):
+    saved_model_loaded = tf.saved_model.load(path, tags=[tag_constants.SERVING])
+    infer = saved_model_loaded.signatures['serving_default']
+
+    data_build = np.zeros((batch_size, image_size[0], image_size[1], 3), dtype='float32')
+    inp = tf.constant(data_build)
+    print("Preping model for prediction....")
+    infer(inp)
+    print("Model ready for prediction!")
+    return infer
+
+def evaluate(model, dataset_path, output, batch_size, use_crf, tensorrt_flag, params):
     data = pd.read_csv(dataset_path)
     scenes = np.unique(data[data['subset'] == 'test'].scene)
 
@@ -154,8 +168,14 @@ def evaluate(model, dataset_path, output, batch_size, use_crf, params):
             x,y = test_generator.__getitem__(n)
             label = y
             #label[n,:] = y[0,:,0]
-            preds = model.predict(x)
-            mask = np.argmax(preds, axis=-1)
+            
+            if tensorrt_flag:
+                inp = tf.constant(x)
+                preds = model(inp)
+                mask = np.argmax(preds[list(preds.keys())[0]].numpy(), axis=-1)
+            else:
+                preds = model.predict(x)
+                mask = np.argmax(preds, axis=-1)
             
             if use_crf:
                 for i in range(batch_size):
@@ -242,8 +262,11 @@ if __name__ == "__main__":
     if args.input_size is not None:
             image_size = (args.input_size[0], args.input_size[1])
 
-    if args.model_folder  is not None:
-        model = load_model(args.model_folder)
+    if args.tensorrt is True:
+        model = load_model_trt(args.model_folder, args.batch_size)
+        params['weights'] = 'tensorrt--' + args.model_folder
+    elif args.model_folder  is not None:
+        model = load_model('xception', new_os, new_alpha, new_norm, args.model_folder, args.load_directly)
         params['Weights'] = args.model_folder
     elif args.model  is not None:
         if args.OS is not None:
@@ -256,15 +279,16 @@ if __name__ == "__main__":
         print(new_norm)
         model = build_model(args.model, new_os, new_alpha, new_norm)
     else:
-        raise Exception("No model or model_folder was definied. Run --help for more details.")
+        raise Exception("No model or model_folder was defined. Run --help for more details.")
     
     params['Backbone'] = args.model
     params['OS'] = new_os
     params['Alpha'] = new_alpha
     params['Input'] = image_size
+    params['Batch'] = args.batch_size
     if new_norm == 1:
         params['Normalization'] = "[0,1]"
     else:
         params['Normalization'] = "[-1,1]"
 
-    evaluate(model, args.dataset, args.output, args.batch_size, args.use_crf, params)
+    evaluate(model, args.dataset, args.output, args.batch_size, args.use_crf, args.tensorrt, params)
